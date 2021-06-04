@@ -13,15 +13,22 @@ class TasksController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+     public function __construct()
     {
-        // タスク一覧を取得
-        $tasks = Task::all();
+        $this->middleware('auth')->except(['index']);
+    }
+    
+    public function index(Request $request)
+    {
+        if (\Auth::check()) {
+            $tasks = $request->user()->tasks()->get();
 
-        // タスク一覧ビューでそれを表示
-        return view('tasks.index', [
-            'tasks' => $tasks,
-        ]);
+            return view('tasks.index', [
+                'tasks' => $tasks,
+            ]);
+        }else {
+            return view('tasks.index');
+        }
     }
 
     /**
@@ -33,7 +40,6 @@ class TasksController extends Controller
     {
         $task = new task;
 
-        // タスク作成ビューを表示
         return view('tasks.create', [
             'task' => $task,
         ]);
@@ -47,19 +53,16 @@ class TasksController extends Controller
      */
     public function store(Request $request)
     {
-        // バリデーション
         $request->validate([
-            'status' => 'required|max:10',   // 追加
+            'status' => 'required|max:10',
             'content' => 'required|max:255',
         ]);
         
-        // タスクを作成
-        $task = new task;
-        $task->status = $request->status;
-        $task->content = $request->content;
-        $task->save();
-
-        // トップページへリダイレクトさせる
+        $request->user()->tasks()->create([
+            'status' => $request->status,
+            'content' => $request->content,
+        ]);
+        
         return redirect('/');
     }
 
@@ -71,13 +74,15 @@ class TasksController extends Controller
      */
     public function show($id)
     {
-        // idの値でタスクを検索して取得
-        $task = task::findOrFail($id);
-
-        // タスク詳細ビューでそれを表示
-        return view('tasks.show', [
-            'task' => $task,
-        ]);
+        $task = Task::findOrFail($id);
+        
+        if (\Auth::id() === $task->user_id) {
+            return view('tasks.show', [
+                'task' => $task,
+            ]);
+        } else {
+            return redirect('/');
+        }
     }
 
     /**
@@ -88,10 +93,8 @@ class TasksController extends Controller
      */
     public function edit($id)
     {
-        // idの値でタスクを検索して取得
         $task = task::findOrFail($id);
-
-        // タスク編集ビューでそれを表示
+        
         return view('tasks.edit', [
             'task' => $task,
         ]);
@@ -106,20 +109,19 @@ class TasksController extends Controller
      */
     public function update(Request $request, $id)
     {
-        // バリデーション
         $request->validate([
             'status' => 'required|max:10',   // 追加
             'content' => 'required|max:255',
         ]);
         
-        // idの値でタスクを検索して取得
         $task = task::findOrFail($id);
-        // タスクを更新
-        $task->status = $request->status;
-        $task->content = $request->content;
-        $task->save();
+        
+        if (\Auth::id() === $task->user_id) {
+            $task->status = $request->status;
+            $task->content = $request->content;
+            $task->save();
+        }
 
-        // トップページへリダイレクトさせる
         return redirect('/');
     }
 
@@ -131,12 +133,12 @@ class TasksController extends Controller
      */
     public function destroy($id)
     {
-        // idの値でタスクを検索して取得
         $task = task::findOrFail($id);
-        // タスクを削除
-        $task->delete();
+        
+        if (\Auth::id() === $task->user_id) {
+            $task->delete();
+        }
 
-        // トップページへリダイレクトさせる
         return redirect('/');
     }
 }
